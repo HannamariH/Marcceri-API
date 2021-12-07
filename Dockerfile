@@ -18,7 +18,7 @@ RUN addgroup -S usemarcon \
       --disable-shared --disable-cpp && make' \
   && sudo -u usemarcon sh -c 'cd /build && chmod +x configure install-sh \
         mkinstalldirs && ./configure --prefix=/usemarcon && \
-         make' \
+        make' \
   && sh -c 'cd /build && make install' \
   && apk del .build-deps \
   && rm -rf /build tmp/* /var/cache/apk/*
