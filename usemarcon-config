@@ -6,8 +6,8 @@ usemarcon_echo_help=no
 usemarcon_echo_source=yes
 usemarcon_echo_lalibs=no
 usemarcon_echo_comp=no
-usemarcon_src_root=/home/hahelle/usemarcon
-usemarcon_build_root=/home/hahelle/usemarcon
+usemarcon_src_root=/mnt/c/Users/hahelle/Nextcloud/Work General/usemarcon-api/usemarcon-api
+usemarcon_build_root=/mnt/c/Users/hahelle/Nextcloud/Work General/usemarcon-api/usemarcon-api
 
 USEMARCONVERSION=3.18
 
