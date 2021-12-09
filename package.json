@@ -1,0 +1,15 @@
+{
+  "name": "usemarcon-api",
+  "version": "1.0.0",
+  "description": "API for using Usemarcon",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.kopla.jyu.fi/osc/usemarcon-api.git"
+  },
+  "author": "",
+  "license": "ISC"
+}

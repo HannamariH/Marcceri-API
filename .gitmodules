@@ -1,0 +1,3 @@
+[submodule "usemarcon-conversion-rules"]
+	path = usemarcon-conversion-rules
+	url = https://gitlab.kopla.jyu.fi/osc/usemarcon-conversion-rules.git
