@@ -23,3 +23,12 @@ RUN chown -R node:node /build \
 
 COPY usemarcon-conversion-rules /usemarcon
 COPY aamulehti.xml /usemarcon
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+RUN npm install
+COPY index.js ./
+CMD [ "node", "index.js" ]
+EXPOSE 3000
+
