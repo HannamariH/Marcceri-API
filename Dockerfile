@@ -22,7 +22,7 @@ RUN chown -R node:node /build \
     && rm -rf /build tmp/* /var/cache/apk/*
 
 COPY usemarcon-conversion-rules /usemarcon
-COPY aamulehti.xml /usemarcon
+RUN mkdir /usemarcon/uploads
 
 WORKDIR /usr/src/app
 

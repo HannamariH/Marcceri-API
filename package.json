@@ -4,7 +4,8 @@
   "description": "API for using Usemarcon",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js"
   },
   "repository": {
     "type": "git",
@@ -13,8 +14,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@koa/multer": "^3.0.0",
     "koa": "^2.13.4",
-    "koa-body": "^4.2.0",
-    "koa-router": "^10.1.1"
+    "koa-router": "^10.1.1",
+    "multer": "^1.4.4",
+    "save": "^2.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
   }
 }
