@@ -3,6 +3,8 @@
 const Koa = require('koa')
 const Router = require('koa-router')
 const multer = require('@koa/multer')
+const { chunksToLinesAsync } = require('@rauschma/stringio');
+const { exec } = require('child_process');
 
 const app = new Koa()
 const router = new Router()
@@ -25,39 +27,57 @@ const limits = {
 }
 const upload = multer({storage,limits})
 
+const streamToString = async (readable) => {
+    let fullStdout = ""
+    for await (const line of chunksToLinesAsync(readable)) {
+        fullStdout += line    
+    }
+    return fullStdout
+}
+
+//-----------routes--------------------------------
 
 router.post('/convert', upload.single('file'), async (ctx)=>{
 
     console.log('ctx.request.body.ini:', ctx.request.body.ini)
 
-    const { exec } = require("child_process")
-    exec(`/usemarcon/bin/usemarcon /usemarcon/${ctx.request.body.ini} /usemarcon/uploads/input.xml /usemarcon/output.xml`, (error, stdout, stderr) => {
+    const output = exec(`/usemarcon/bin/usemarcon /usemarcon/${ctx.request.body.ini} /usemarcon/uploads/input.xml /usemarcon/output.xml`)
+
+    const result = await streamToString(output.stdout)
+
+    return ctx.body = {
+        data: result
+    }
+
+    /*exec(`/usemarcon/bin/usemarcon /usemarcon/${ctx.request.body.ini} /usemarcon/uploads/input.xml /usemarcon/output.xml`, (error, stdout, stderr) => {
     if (error) {
         console.log("error: " + error.message)
-        ctx.body = {
+        return ctx.body = {
             data: ctx.file,
             error: error.message
         }
     }
     if (stderr) {
         console.log("stderr: " + stderr)
-        ctx.body = {
+        return ctx.body = {
             data: ctx.file,
             stderr: stderr
         }
     }
     console.log("stdout: " + stdout)
-    ctx.body = {
+    return ctx.body = {
         data: ctx.file,
         stdout: stdout
     }
     })
 
-    ctx.body = {
+    return ctx.body = {
         data: "viimeinen vara"
-    }
+    }*/
     
 })
+
+
 
 app.use(router.routes()).use(router.allowedMethods())
 
