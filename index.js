@@ -1,12 +1,14 @@
 'use strict'
 
 const Koa = require('koa')
+const cors = require("@koa/cors")
 const Router = require('koa-router')
 const multer = require('@koa/multer')
 const { exec } = require('child_process')
 const fs = require("fs")
 
 const app = new Koa()
+app.use(cors())
 const router = new Router()
 
 //Upload File Storage Path and File Naming
@@ -21,12 +23,12 @@ const storage = multer.diskStorage({
     }
 })
 //TODO: onko nämä tarpeen? Kopioitu mallista.
-const limits = {
+/*const limits = {
     fields: 10,//Number of non-file fields
     fileSize: 500 * 1024,//File Size Unit b
     files: 1//Number of documents
-}
-const upload = multer({ storage, limits })
+}*/
+const upload = multer({ storage/*, limits*/ })
 
 const streamToString = async (readable) => {
 
@@ -40,7 +42,7 @@ const streamToString = async (readable) => {
 }
 
 const getTitles = () => {
-    const file = fs.readFileSync("/usemarcon/uploads/input.xml", "utf-8")
+    const file = fs.readFileSync("/usemarcon/output.xml", "utf-8")
 
     const titleFieldRegex = /<datafield tag="245"((.|\s)*?)<\/datafield>/g
     const beforeTitleRegex = /<datafield tag="245"((.|\s)*?)<subfield code="a">/g
@@ -69,6 +71,7 @@ router.post('/convert', upload.single('file'), async (ctx) => {
     try {
         output = exec(`/usemarcon/bin/usemarcon /usemarcon/${ctx.request.body.ini} /usemarcon/uploads/input.xml /usemarcon/output.xml`)
         let result = await streamToString(output.stdout)
+        console.log(result)
 
         result = result.split("Conversion progress:")[1]
 
