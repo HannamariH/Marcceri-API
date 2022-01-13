@@ -6,6 +6,8 @@ const Router = require('koa-router')
 const multer = require('@koa/multer')
 const { exec } = require('child_process')
 const fs = require("fs")
+const axios = require('axios')
+require('dotenv').config()
 
 const app = new Koa()
 app.use(cors())
@@ -60,6 +62,18 @@ const getTitles = () => {
     return titles
 }
 
+const splitOutput = () => {
+    //TODO: tarkista, että output.xml on olemassa (try-catch?)
+    const file = fs.readFileSync("/usemarcon/output.xml", "utf-8")
+    const strippedFile = file.replace(/((.|\s)*?)<collection((.|\s)*?)>/, "").replace("</collection>", "").trim()
+    let records = strippedFile.split("</record>")
+    //remove empty elements
+    records = records.filter(Boolean)
+    //add closing tag back
+    records = records.map(record => record.concat("</record>"))
+    return records
+}
+
 //-----------routes--------------------------------
 
 router.post('/convert', upload.single('file'), async (ctx) => {
@@ -94,9 +108,39 @@ router.post('/convert', upload.single('file'), async (ctx) => {
 })
 
 //postaa output.xml-tiedoston tietueet Kohaan, yksi kerrallaan
-router.post("/toKoha", async (ctx) => {
+router.post("/tokoha", async (ctx) => {
+
     //TODO: tarkista, että on olemassa output.xml, josta voi poimia tietueet lähetettäväksi
     //(miten tarkistetaan, että output.xml on tuore?)
+
+    const records = splitOutput()
+
+    let biblionumbers = []
+
+    for (const record of records) {
+        //post to koha
+        await axios({
+            method: "POST",
+            data: record,
+            url: "https://app1.jyu.koha.csc.fi/api/v1/contrib/natlibfi/biblios",
+            headers: {
+                'Content-Type': 'text/xml',
+                'Authorization': `Basic ${process.env.BASIC}`
+            }
+        }).then((response) => {
+            console.log(response.data.biblio_id)
+            biblionumbers.push(response.data.biblio_id)
+            console.log("biblionumbers: ", biblionumbers)
+        }).catch(error => {
+            console.log(error)
+            //TODO: break, ei enää postata uusia tietueita?
+            //TODO: ilmoita käyttäjälle, että epäonnistui (xml tai siitä nimeke?)
+        })
+    }
+
+    ctx.body = {
+        biblionumbers: biblionumbers
+    }
 })
 
 
