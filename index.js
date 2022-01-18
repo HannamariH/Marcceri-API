@@ -4,6 +4,7 @@ const Koa = require('koa')
 const cors = require("@koa/cors")
 const Router = require('koa-router')
 const multer = require('@koa/multer')
+const bodyParser = require("koa-bodyparser")
 const { exec } = require('child_process')
 const fs = require("fs")
 const axios = require('axios')
@@ -11,6 +12,7 @@ require('dotenv').config()
 
 const app = new Koa()
 app.use(cors())
+app.use(bodyParser())
 const router = new Router()
 
 //Upload File Storage Path and File Naming
@@ -112,6 +114,8 @@ router.post("/tokoha", async (ctx) => {
 
     //TODO: tarkista, että on olemassa output.xml, josta voi poimia tietueet lähetettäväksi
     //(miten tarkistetaan, että output.xml on tuore?)
+
+    const bibliosToPost = ctx.request.body
 
     const records = splitOutput()
 
