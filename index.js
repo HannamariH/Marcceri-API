@@ -7,6 +7,8 @@ const multer = require('@koa/multer')
 const bodyParser = require("koa-bodyparser")
 const { exec } = require('child_process')
 const fs = require("fs")
+const AmdZip = require("adm-zip")
+const path = require("path")
 const axios = require('axios')
 require('dotenv').config()
 
@@ -54,7 +56,7 @@ const getTitles = () => {
 
     const datafields = file.match(titleFieldRegex)
 
-    const titles = []    
+    const titles = []
 
     for (let field of datafields) {
         let strippedField = field.replace(beforeTitleRegex, "").replace(afterTitleRegex, "")
@@ -76,6 +78,18 @@ const splitOutput = () => {
     return records
 }
 
+const unzipFiles = () => {
+    try {
+        const zip = new AmdZip("/usemarcon/uploads/input.xml")
+        const outputDir = "/usemarcon/output"
+        zip.extractAllTo(outputDir)
+        console.log(`extracted to ${outputDir} succesfully`)
+    } catch (error) {
+        console.log(error)
+    }
+
+}
+
 //-----------routes--------------------------------
 
 router.post('/convert', upload.single('file'), async (ctx) => {
@@ -83,17 +97,39 @@ router.post('/convert', upload.single('file'), async (ctx) => {
     //TODO: voiko tässä vielä poistaa edellisen input.xml:n? Tai onko tarvetta?
     //TODO: tsekkaa, onko zip ja unzippaa
 
+    if (ctx.request.body.filetype === "application/zip") {
+        //zippaa, johonkin samaan kansioon (/usemarcon/output?)
+        //laita usemarcon ja tokoha toimimaan riippumatta siitä, oliko tiedostoja yksi vai monta
+        console.log("oli zippi")
+        unzipFiles()
+    } else {
+        console.log("ei ollut zippi")
+    }
+
     let output = ""
     try {
         output = exec(`/usemarcon/bin/usemarcon /usemarcon/${ctx.request.body.ini} /usemarcon/uploads/input.xml /usemarcon/output.xml`)
         let result = await streamToString(output.stdout)
         console.log(result)
 
-        result = result.split("Conversion progress:")[1]
+        //TODO: onko vaara, että aina ei ole "100%" tuloksessa? jos on epäkelpoja tietueita?
+        result = result.split("100% ")[1]
 
-        //TODO: resultille parsimista, erroreista ja warningeista riippuen erilaiset responset
+        //result = "Converted records: " + result
 
-        const titles = getTitles()
+        //TODO: resultille parsimista, erroreista ja warningeista riippuen erilaiset responset?
+
+        let titles = []
+        //jos tiedosto on väärässä muodossa, datafieldsejä ei välttämättä löydy
+        //silloin TypeError: datafields is not iterable
+        try {
+            titles = getTitles()
+        } catch (TypeError) {
+            ctx.status = 500
+            return ctx.body = {
+                error: TypeError.message
+            }
+        }
 
         return ctx.body = {
             data: result,
@@ -121,25 +157,30 @@ router.post("/tokoha", async (ctx) => {
 
     let biblionumbers = []
 
-    for (const record of records) {
-        //post to koha
-        await axios({
-            method: "POST",
-            data: record,
-            url: "https://app1.jyu.koha.csc.fi/api/v1/contrib/natlibfi/biblios",
-            headers: {
-                'Content-Type': 'text/xml',
-                'Authorization': `Basic ${process.env.BASIC}`
-            }
-        }).then((response) => {
-            console.log(response.data.biblio_id)
-            biblionumbers.push(response.data.biblio_id)
-            console.log("biblionumbers: ", biblionumbers)
-        }).catch(error => {
-            console.log(error)
-            //TODO: break, ei enää postata uusia tietueita?
-            //TODO: ilmoita käyttäjälle, että epäonnistui (xml tai siitä nimeke?)
-        })
+    //for-looppi, jossa verrataan recordin ja bibliosToPostin indeksiä?
+
+    //onhan records.length === bibliosToPost.length??
+
+    for (let i = 0; i < records.length; i++) {
+        if (bibliosToPost[i]) {
+            await axios({
+                method: "POST",
+                data: records[i],
+                url: "https://app1.jyu.koha.csc.fi/api/v1/contrib/natlibfi/biblios",
+                headers: {
+                    'Content-Type': 'text/xml',
+                    'Authorization': `Basic ${process.env.BASIC}`
+                }
+            }).then((response) => {
+                console.log(response.data.biblio_id)
+                biblionumbers.push(response.data.biblio_id)
+                console.log("biblionumbers: ", biblionumbers)
+            }).catch(error => {
+                console.log(error)
+                //TODO: break, ei enää postata uusia tietueita?
+                //TODO: ilmoita käyttäjälle, että epäonnistui (xml tai siitä nimeke?)
+            })
+        }
     }
 
     ctx.body = {

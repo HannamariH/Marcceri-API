@@ -17,6 +17,7 @@
   "dependencies": {
     "@koa/cors": "^3.1.0",
     "@koa/multer": "^3.0.0",
+    "adm-zip": "^0.5.9",
     "axios": "^0.24.0",
     "dotenv": "^11.0.0",
     "koa": "^2.13.4",
