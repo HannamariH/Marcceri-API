@@ -79,15 +79,17 @@ const splitOutput = () => {
 }
 
 const unzipFiles = () => {
-    try {
-        const zip = new AmdZip("/usemarcon/uploads/input.xml")
-        const outputDir = "/usemarcon/output"
-        zip.extractAllTo(outputDir)
-        console.log(`extracted to ${outputDir} succesfully`)
-    } catch (error) {
-        console.log(error)
-    }
-
+    const zip = new AmdZip("/usemarcon/uploads/input.xml")
+    fs.rmSync("/usemarcon/uploads/extracted", { recursive: true, force: true })
+    const outputDir = "/usemarcon/uploads/extracted"
+    zip.extractAllTo(outputDir)
+    const files = fs.readdirSync(outputDir)
+    files.forEach((file) => {
+        const extension = file.split(".").pop()
+        if (extension === "mrc" | extension === "xml") {
+            fs.renameSync(`/usemarcon/uploads/extracted/${file}`, "/usemarcon/uploads/input.xml")
+        }
+    })
 }
 
 //-----------routes--------------------------------
@@ -95,15 +97,16 @@ const unzipFiles = () => {
 router.post('/convert', upload.single('file'), async (ctx) => {
 
     //TODO: voiko tässä vielä poistaa edellisen input.xml:n? Tai onko tarvetta?
-    //TODO: tsekkaa, onko zip ja unzippaa
 
     if (ctx.request.body.filetype === "application/zip") {
-        //zippaa, johonkin samaan kansioon (/usemarcon/output?)
-        //laita usemarcon ja tokoha toimimaan riippumatta siitä, oliko tiedostoja yksi vai monta
-        console.log("oli zippi")
-        unzipFiles()
-    } else {
-        console.log("ei ollut zippi")
+        try {
+            unzipFiles()
+        } catch (error) {
+            ctx.status = 500
+            return ctx.body = {
+                error: "Unzipping failed"
+            }
+        }
     }
 
     let output = ""
@@ -130,7 +133,6 @@ router.post('/convert', upload.single('file'), async (ctx) => {
                 error: TypeError.message
             }
         }
-
         return ctx.body = {
             data: result,
             titles: titles
@@ -156,8 +158,6 @@ router.post("/tokoha", async (ctx) => {
     const records = splitOutput()
 
     let biblionumbers = []
-
-    //for-looppi, jossa verrataan recordin ja bibliosToPostin indeksiä?
 
     //onhan records.length === bibliosToPost.length??
 
