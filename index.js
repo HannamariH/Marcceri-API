@@ -22,8 +22,6 @@ const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, '/usemarcon/uploads')
     },
-    //TODO: tähän tarkistus, mikä on tiedostopääte/-tyyppi
-    //.mrc näkyy toimivan myös, vaikka pääte on xml
     filename: function (req, file, cb) {
         cb(null, "input.xml")
     }
@@ -116,8 +114,10 @@ router.post('/convert', upload.single('file'), async (ctx) => {
         console.log(result)
 
         //TODO: onko vaara, että aina ei ole "100%" tuloksessa? jos on epäkelpoja tietueita?
-        result = result.split("100% ")[1]
-
+        if (!result.includes("ERROR") && !result.includes("WARNING")) {
+            result = result.split("100% ")[1]
+            console.log("result: ", result)
+        }       
         //result = "Converted records: " + result
 
         //TODO: resultille parsimista, erroreista ja warningeista riippuen erilaiset responset?
@@ -158,6 +158,7 @@ router.post("/tokoha", async (ctx) => {
     const records = splitOutput()
 
     let biblionumbers = []
+    let kohaError = ""
 
     //onhan records.length === bibliosToPost.length??
 
@@ -176,13 +177,18 @@ router.post("/tokoha", async (ctx) => {
                 biblionumbers.push(response.data.biblio_id)
                 console.log("biblionumbers: ", biblionumbers)
             }).catch(error => {
-                console.log(error)
-                //TODO: break, ei enää postata uusia tietueita?
-                //TODO: ilmoita käyttäjälle, että epäonnistui (xml tai siitä nimeke?)
+                console.log(error.response.data)
+                kohaError = `Tietueen ${[i+1]} tallentaminen Kohaan epäonnistui`
             })
         }
+        if (kohaError) break
     }
-
+    if (kohaError) {
+        ctx.status = 500
+        return ctx.body = {
+            error: kohaError
+        }
+    }
     ctx.body = {
         biblionumbers: biblionumbers
     }
