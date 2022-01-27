@@ -30,6 +30,7 @@ COPY package*.json ./
 RUN npm install
 COPY index.js ./
 COPY .env ./
+COPY config.json ./
 CMD [ "node", "index.js" ]
 EXPOSE 3000
 

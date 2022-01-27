@@ -11,10 +11,23 @@ const AmdZip = require("adm-zip")
 const path = require("path")
 const axios = require('axios')
 require('dotenv').config()
+const config = require("./config.json")
 
 const app = new Koa()
 app.use(cors())
 app.use(bodyParser())
+app.use(async (ctx, next) => {
+    //TODO: alla oleva rivi käyttöön tuotannossa
+    //if (config.users.includes(ctx.request.headers.mail)) {
+    if (config.users.includes("hannamari.h.heiniluoma@jyu.fi")) {
+        console.log("käyttäjä sallittu")
+        await next()
+    } else {
+        console.log("access denied for user: ", ctx.request.headers.mail)
+        ctx.status = 403
+        ctx.body = {error: "Sinulla ei ole oikeutta Marccerin käyttöön."}
+    }
+})
 const router = new Router()
 
 //Upload File Storage Path and File Naming
@@ -26,13 +39,8 @@ const storage = multer.diskStorage({
         cb(null, "input.xml")
     }
 })
-//TODO: onko nämä tarpeen? Kopioitu mallista.
-/*const limits = {
-    fields: 10,//Number of non-file fields
-    fileSize: 500 * 1024,//File Size Unit b
-    files: 1//Number of documents
-}*/
-const upload = multer({ storage/*, limits*/ })
+
+const upload = multer({ storage })
 
 const streamToString = async (readable) => {
 
