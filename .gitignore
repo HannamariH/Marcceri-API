@@ -3,6 +3,7 @@ build
 npm-debug.log
 .env
 .DS_Store
+.vscode
 input.xml
 node.js
 config.json

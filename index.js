@@ -16,17 +16,19 @@ const config = require("./config.json")
 const app = new Koa()
 app.use(cors())
 app.use(bodyParser())
+
 app.use(async (ctx, next) => {
     //TODO: alla oleva rivi käyttöön tuotannossa
     //if (config.users.includes(ctx.request.headers.mail)) {
-    if (config.users.includes("hannamari.h.heiniluoma@jyu.fi")) {
-        console.log("käyttäjä sallittu")
-        await next()
-    } else {
-        console.log("access denied for user: ", ctx.request.headers.mail)
-        ctx.status = 403
-        ctx.body = {error: "Sinulla ei ole oikeutta Marccerin käyttöön."}
-    }
+        if (config.users.includes("hannamari.h.heiniluoma@jyu.fi")) {
+            console.log("käyttäjä sallittu")
+            ctx.status = 200
+            await next()
+        } else {
+            console.log("access denied for user: ", ctx.request.headers.mail)
+            ctx.status = 403
+            ctx.body = {error: "Sinulla ei ole oikeutta Marccerin käyttöön."}
+        }
 })
 const router = new Router()
 
@@ -99,6 +101,10 @@ const unzipFiles = () => {
 }
 
 //-----------routes--------------------------------
+
+router.get("/auth", async (ctx, next) => {
+    await next()
+})
 
 router.post('/convert', upload.single('file'), async (ctx) => {
 
