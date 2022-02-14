@@ -125,6 +125,17 @@ const unzipFiles = () => {
     })
 }
 
+const getRecordsWithErrors = (conversionMessage) => {
+    const errorRegex = /ERROR (.*).*(record \d*,.*)/g
+    const errors = conversionMessage.match(errorRegex)
+    let recordNumbers = []
+    for (const error of errors) {
+        const errorNumber = error.replace(/.*record\s/, "").replace(/,.*\)/, "").trim()
+        recordNumbers.push(errorNumber)
+    }
+    return recordNumbers
+}
+
 //-----------routes--------------------------------
 
 router.get("/auth", async (ctx, next) => {
@@ -165,6 +176,12 @@ router.post('/convert', upload.single('file'), async (ctx) => {
             //tarviiko WARNINGeista välittää tässä? errors = false vaikka WARNINGeja oliskin?
             errors = false
         }
+
+        let errorRecords = []
+        if (errors) {
+            errorRecords = getRecordsWithErrors(result)
+        }
+        console.log("errorRecords", errorRecords)
         //result = "Converted records: " + result
 
         //TODO: resultille parsimista, erroreista ja warningeista riippuen erilaiset responset?
@@ -187,7 +204,7 @@ router.post('/convert', upload.single('file'), async (ctx) => {
         return ctx.body = {
             conversionMessage: result,
             titles: titles,
-            errors: errors
+            errorRecords: errorRecords
         }
     } catch (error) {
         console.log(error)
