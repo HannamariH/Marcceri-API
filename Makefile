@@ -706,3 +706,36 @@ uninstall-am:
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
+
+
+#tästä eteenpäin marccerin komentoja
+
+IMAGES := $(shell docker images -f "dangling=true" -q)
+CONTAINERS := $(shell docker ps -a -q -f status=exited)
+VOLUME := marcceri
+
+clean:
+	docker rm -f $(CONTAINERS)
+	docker rmi -f $(IMAGES)
+
+build:
+	docker buildx build --platform linux/amd64 -t osc.repo.kopla.jyu.fi/hahelle/marcceri:latest .
+
+push:
+	docker push osc.repo.kopla.jyu.fi/hahelle/marcceri:latest
+
+pull:
+	docker pull osc.repo.kopla.jyu.fi/hahelle/marcceri:latest
+
+start:
+	docker run -d --name marcceri \
+			-v $(VOLUME):/usr/src/app/logs \
+			-p 3008:3000 osc.repo.kopla.jyu.fi/hahelle/marcceri
+
+restart:
+	docker stop marcceri
+	docker rm marcceri
+	$(MAKE) start
+
+bash:
+	docker exec -it marcceri sh

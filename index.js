@@ -19,14 +19,11 @@ app.use(cors())
 app.use(bodyParser())
 
 app.use(async (ctx, next) => {
-    //TODO: alla oleva rivi käyttöön tuotannossa
-    //if (config.users.includes(ctx.request.headers.mail)) {
-    if (config.users.includes("hannamari.h.heiniluoma@jyu.fi")) {
-        console.log("käyttäjä sallittu")
+    if (config.users.includes(ctx.request.headers.mail)) {
+    //if (config.users.includes("hannamari.h.heiniluoma@jyu.fi")) {
         ctx.status = 200
         await next()
     } else {
-        console.log("access denied for user: ", ctx.request.headers.mail)
         logger.error({
             message: "access denied",
             user: ctx.request.headers.mail
@@ -67,39 +64,38 @@ const logger = winston.createLogger({
 })
 
 const streamToString = async (readable) => {
-    console.log("streamtostringissä")
-
     const chunks = []
-
     for await (const chunk of readable) {
-        console.log("chunk", Buffer.from(chunk).toString("utf-8"))
         chunks.push(Buffer.from(chunk))
     }
-
     return Buffer.concat(chunks).toString("utf-8")
 }
 
 const getTitles = () => {
     const file = fs.readFileSync("/usemarcon/output.xml", "utf-8")
-
     const titleFieldRegex = /<datafield tag="245"((.|\s)*?)<\/datafield>/g
     const beforeTitleRegex = /<datafield tag="245"((.|\s)*?)<subfield code="a">/g
     const afterTitleRegex = /<\/subfield>((.|\s)*?)$/g
-
     const datafields = file.match(titleFieldRegex)
-
     const titles = []
-
     for (let field of datafields) {
         let strippedField = field.replace(beforeTitleRegex, "").replace(afterTitleRegex, "")
         titles.push(strippedField)
     }
-
     return titles
 }
 
+//TODO: voiko yhdistää yllä olevan getTitlesin kanssa?
+const getTitle = (record) => {
+    const titleFieldRegex = /<datafield tag="245"((.|\s)*?)<\/datafield>/g
+    const beforeTitleRegex = /<datafield tag="245"((.|\s)*?)<subfield code="a">/g
+    const afterTitleRegex = /<\/subfield>((.|\s)*?)$/g
+    const titlefield = record.match(titleFieldRegex)
+    const title = titlefield[0].replace(beforeTitleRegex, "").replace(afterTitleRegex, "")
+    return title
+}
+
 const splitOutput = () => {
-    //TODO: tarkista, että output.xml on olemassa (try-catch?)
     const file = fs.readFileSync("/usemarcon/output.xml", "utf-8")
     const strippedFile = file.replace(/((.|\s)*?)<collection((.|\s)*?)>/, "").replace("</collection>", "").trim()
     let records = strippedFile.split("</record>")
@@ -131,9 +127,17 @@ const getRecordsWithErrors = (conversionMessage) => {
     let recordNumbers = []
     for (const error of errors) {
         const errorNumber = error.replace(/.*record\s/, "").replace(/,.*\)/, "").trim()
-        recordNumbers.push(errorNumber)
+        recordNumbers.push(parseInt(errorNumber))
     }
-    return recordNumbers
+    const titles = getTitles()
+    let erroneousRecords = []
+    for (let i = 0; i < recordNumbers.length; i++) {
+        erroneousRecords.push({
+            titleNumber: recordNumbers[i],
+            title: titles[recordNumbers[i]-1]
+        })
+    }
+    return erroneousRecords
 }
 
 //-----------routes--------------------------------
@@ -143,8 +147,6 @@ router.get("/auth", async (ctx, next) => {
 })
 
 router.post('/convert', upload.single('file'), async (ctx) => {
-
-    //TODO: voiko tässä vielä poistaa edellisen input.xml:n? Tai onko tarvetta?
 
     if (ctx.request.body.filetype === "application/zip") {
         try {
@@ -165,26 +167,26 @@ router.post('/convert', upload.single('file'), async (ctx) => {
     try {
         output = exec(`/usemarcon/bin/usemarcon /usemarcon/${ctx.request.body.ini} /usemarcon/uploads/input.xml /usemarcon/output.xml`)
         let result = await streamToString(output.stdout)
-        console.log(result)
 
         let errors = true
 
-        if (!result.includes("ERROR") && !result.includes("WARNING")) {
-            //TODO: onko vaara, että aina ei ole "100%" tuloksessa? jos on epäkelpoja tietueita?
+        if (!result.includes("ERROR")/* && !result.includes("WARNING")*/) {
             result = result.split("100% ")[1]
-            console.log("result: ", result)
-            //tarviiko WARNINGeista välittää tässä? errors = false vaikka WARNINGeja oliskin?
             errors = false
         }
 
         let errorRecords = []
         if (errors) {
-            errorRecords = getRecordsWithErrors(result)
+            try {
+                errorRecords = getRecordsWithErrors(result)
+            } catch (TypeError) {
+                logger.error({
+                    message: "TypeError, ERROR-viesti jota palvelin ei osaa käsitellä.",
+                    file: ctx.request.body.filename,
+                    errorMessage: result
+                })
+            }
         }
-        console.log("errorRecords", errorRecords)
-        //result = "Converted records: " + result
-
-        //TODO: resultille parsimista, erroreista ja warningeista riippuen erilaiset responset?
 
         let titles = []
         //jos tiedosto on väärässä muodossa, datafieldsejä ei välttämättä löydy
@@ -207,7 +209,6 @@ router.post('/convert', upload.single('file'), async (ctx) => {
             errorRecords: errorRecords
         }
     } catch (error) {
-        console.log(error)
         logger.error({
             message: error.message
         })
@@ -217,69 +218,78 @@ router.post('/convert', upload.single('file'), async (ctx) => {
             file: ctx.request.body.filename
         }
     }
-
 })
 
 //postaa output.xml-tiedoston tietueet Kohaan, yksi kerrallaan
 router.post("/tokoha", async (ctx) => {
 
-    //TODO: KOKO REITIN PITÄÄ PERUSTUA ENEMMÄN TIETUEIDEN NIMILLE! Ne myös lokituksiin
+    const titles = ctx.request.body.titles
 
-    //TODO: tarkista, että on olemassa output.xml, josta voi poimia tietueet lähetettäväksi
-    //(miten tarkistetaan, että output.xml on tuore?)
+    let records = []
+    try {
+        records = splitOutput()
+    } catch (error) {
+        ctx.status = 500
+        return ctx.body = {
+            error: "Konvertoitua marc-tiedostoa ei löydy."
+        }
+    }
 
-    const bibliosToPost = ctx.request.body
-
-    const records = splitOutput()
-
-    let biblionumbers = []
+    let biblios = []
     let kohaError = ""
 
-    //onhan records.length === bibliosToPost.length??
-    //TODO: ei ole, jos on tullut virheitä! (esim. 3_virheita.xml)
-
-    console.log("records.length", records.length)
-    console.log("bibliosToPost.length", bibliosToPost.length)
-
-    for (let i = 0; i < records.length; i++) {
-        if (bibliosToPost[i]) {
+    // etsitään postattavat tietueet nimekkeen perusteella ja postataan ne Kohaan
+    let titlesFound = 0
+    for (const record of records) {
+        let title = ""
+            try {
+                title = getTitle(record)
+            } catch {
+                continue 
+            }  
+        if (titles.includes(title)) {
+            titlesFound++
             await axios({
                 method: "POST",
-                data: records[i],
+                data: record,
                 url: "https://app1.jyu.koha.csc.fi/api/v1/contrib/natlibfi/biblios",
                 headers: {
                     'Content-Type': 'text/xml',
                     'Authorization': `Basic ${process.env.BASIC}`
                 }
             }).then((response) => {
-                console.log(response.data.biblio_id)
-                biblionumbers.push(response.data.biblio_id)
-                console.log("biblionumbers: ", biblionumbers)
+                biblios.push({title: title, url: `https://app1.jyu.koha.csc.fi/cgi-bin/koha/catalogue/detail.pl?biblionumber=${response.data.biblio_id}`})
             }).catch(error => {
-                console.log(error.response.data)
-                kohaError = `Tietueen ${[i + 1]} tallentaminen Kohaan epäonnistui`
+                kohaError = `Tietueen ${title} tallentaminen Kohaan epäonnistui`
             })
+        } if (kohaError || titlesFound >= titles.length) {  //jos kaikki titlet on postattu, voidaan for-looppi lopettaa
+            break
         }
-        if (kohaError) break
-    }
+    } 
     if (kohaError) {
-        //TODO: kohaErroriin tietueen nimi!
         logger.error({
             käyttäjä: ctx.request.headers.mail,
             kohaError: kohaError
         })
+        logger.info({
+            message: "Tallennettu Kohaan",
+            user: ctx.request.headers.mail,
+            biblios: biblios
+        })
+        // tässä tapauksessa kuitenkin onnistuneet tietueet UI:hin (ja lokiin)
         ctx.status = 500
         return ctx.body = {
-            error: kohaError
+            error: kohaError,
+            biblios: biblios
         }
     }
     logger.info({
         message: "Tallennettu Kohaan",
-        käyttäjä: ctx.request.headers.mail,
-        tietueet: biblionumbers
+        user: ctx.request.headers.mail,
+        biblios: biblios
     })
     ctx.body = {
-        biblionumbers: biblionumbers
+        biblios: biblios
     }
 })
 
