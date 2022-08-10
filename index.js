@@ -20,7 +20,6 @@ app.use(bodyParser())
 
 app.use(async (ctx, next) => {
     if (config.users.includes(ctx.request.headers.mail)) {
-    //if (config.users.includes("hannamari.h.heiniluoma@jyu.fi")) {
         ctx.status = 200
         await next()
     } else {

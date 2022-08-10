@@ -730,7 +730,7 @@ pull:
 start:
 	docker run -d --name marcceri \
 			-v $(VOLUME):/usr/src/app/logs \
-			-p 3008:3000 osc.repo.kopla.jyu.fi/hahelle/marcceri
+			-p <port>:3000 osc.repo.kopla.jyu.fi/hahelle/marcceri
 
 restart:
 	docker stop marcceri
